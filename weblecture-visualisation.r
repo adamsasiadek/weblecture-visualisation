@@ -8,11 +8,15 @@
 #                                                                                                                                                           #
 #############################################################################################################################################################
 
+# Empty memory
+rm(list=ls())
+
 # Libraries:
 require(readxl) # for reading XLS files
-require(chron)
 require(stringr)
-#library("lubridate")  #install.packages("lubridate") # For finding date within range
+library("lubridate")  #install.packages("lubridate") # For finding date within range
+library(ggplot2)
+require(scales) # For making plotting of different date ranges easier
 
 # First Plot: Line Plot showing total views per lecture per week.
 ## Loading and cleaning data
@@ -23,12 +27,28 @@ data <- read_excel("data/WSR-weblectures-nodiff.xlsx", sheet = 7)
 data <- data[,c(1,2,4:7)]
 
 ### Converting time/date veriables to chron objects for later calculations
-### Check origin when importing. Can be different depending on software eg. EXCEL or CALC and OS!!
+### Check origin date when importing. Can be different depending on software eg. EXCEL or CALC and OS!!
+origin_time <- dmy_hms("30-12-1899 00:00:00")
+data$Opened <- origin_time + ddays(data$Opened)
+data$`Last Active` <- origin_time + ddays(data$`Last Active`)
 
-data$Opened <- chron(data$Opened,format = c("d-m-yy", "h:m:s"), origin = c(month = 12, day = 30, year = 1899))
-data$`Last Active` <- chron(data$`Last Active`,format = c("d-m-y", "h:m:s"), origin = c(month = 12, day = 30, year = 1899))
-
-is(data$`Time Watched (h:mm:ss)`)
 ### Creating variable with date of Video
-date_of_lecture <- sapply(data[,1], function(x) strsplit(x,split = "- ")[[1]][4])
-cbind(data,test)
+#### extracting date pattern
+date_of_lecture <- str_match(pattern = "....[:digit:]-[:digit:][:digit:][:digit:][:digit:]", string =data[,1])
+#### cleaning up white space
+date_of_lecture <- str_trim(str_replace(date_of_lecture, pattern = "^-",replacement = ""))
+#### Converting to date format
+date_of_lecture <- dmy(date_of_lecture)
+data <- cbind(date_of_lecture,data)
+
+### Preparing the data for plotting in ggplot2
+
+plotdf <- data.frame(date_of_lecture = date_of_lecture, date_opened = round_date(data[,4], "day"))
+plotdf <- as.data.frame(table(plotdf))
+plotdf$date_opened <- ymd(plotdf$date_opened)
+#date_for_plotting <- min(testdf[,2]) + c(-5:(max(testdf[,2]) - min(testdf[,2])+5)) * days(1)
+
+### Plot of frequenties views of each lecture by date. 
+base <- ggplot(plotdf, aes(date_opened,Freq)) + geom_line() + scale_x_datetime(breaks=date_breaks("3 day"),minor_breaks = date_breaks("1 day")) + facet_grid(date_of_lecture ~ .) + theme(axis.text.x = element_text(angle = 90, hjust = 1), strip.text.y = element_text(size=6, angle= 0))
+base
+ 
